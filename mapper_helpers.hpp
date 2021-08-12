@@ -158,6 +158,11 @@ KfId addKeyframeBackend(
 
 ViewerAtlasMap mapDBtoViewerAtlasMap(const MapDB &mapDB);
 
+void serializeKeyframe(
+    MapDB &mapDB,
+    const Keyframe &currentKeyframe
+);
+
 } // namespace slam
 
 #endif //SLAM_MAPPER_HELPERS_HPP

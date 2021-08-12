@@ -10,6 +10,8 @@
 #include "keyframe_matcher.hpp"
 #include "mapdb.hpp"
 
+#include <nlohmann/json.hpp>
+
 using Eigen::Matrix3d;
 using Eigen::Matrix4d;
 using Matrix3x4d = Eigen::Matrix<double,3,4>;
@@ -1004,6 +1006,8 @@ void addKeyframeCommonInner(
         }
     }
 
+    serializeKeyframe(mapDB, currentKeyframe);
+
     cullMapPoints(currentKeyframe, mapDB, ps);
     cullKeyframes(adjacentKfIds, mapDB, *bowIndex, ps);
 
@@ -1143,6 +1147,86 @@ KfId addKeyframeBackend(
         dataPublisher,
         resultPose,
         resultPointCloud);
+}
+
+nlohmann::json eigenToJson(const Eigen::Matrix3d &m) {
+    nlohmann::json j = nlohmann::json::array({
+        { m(0, 0), m(0, 1), m(0, 2) },
+        { m(1, 0), m(1, 1), m(1, 2) },
+        { m(2, 0), m(2, 1), m(2, 2) }
+    });
+    return j;
+}
+
+nlohmann::json eigenToJson(const Eigen::Matrix4d &m) {
+    nlohmann::json j = nlohmann::json::array({
+        { m(0, 0), m(0, 1), m(0, 2), m(0, 3) },
+        { m(1, 0), m(1, 1), m(1, 2), m(1, 3) },
+        { m(2, 0), m(2, 1), m(2, 2), m(2, 3) },
+        { m(3, 0), m(3, 1), m(3, 2), m(3, 3) }
+    });
+    return j;
+}
+
+void serializeKeyframe(
+    MapDB &mapDB,
+    const Keyframe &currentKeyframe
+) {
+    nlohmann::json j;
+    nlohmann::json newMapPoints = nlohmann::json::array();
+    nlohmann::json changedMapPointIds = nlohmann::json::array();
+    nlohmann::json changedMapPointPositions = nlohmann::json::array();
+
+    for (const auto &p : mapDB.mapPoints) {
+        MpId mpId = p.first;
+        const auto &mapPoint = p.second;
+        if (mapDB.altMapPointRecords.count(mpId)) {
+            if (mapDB.altMapPointRecords.at(mpId).position != mapPoint.position) {
+                mapDB.altMapPointRecords.at(mpId).position = mapPoint.position;
+                changedMapPointIds.push_back(mpId.v);
+                changedMapPointPositions.push_back({
+                    mapPoint.position(0),
+                    mapPoint.position(1),
+                    mapPoint.position(2)
+                });
+            }
+        }
+        else {
+            AltMapPointRecord a = {
+                .position = mapPoint.position,
+            };
+            mapDB.altMapPointRecords.insert({mpId, a});
+            nlohmann::json newMapPoint;
+            newMapPoint["id"] = mpId.v;
+            newMapPoint["position"] = { a.position(0), a.position(1), a.position(2) };
+            newMapPoints.push_back(newMapPoint);
+        }
+    }
+
+    j["newMapPoints"] = newMapPoints;
+    j["changedMapPointPositions"] = {
+        "ids", changedMapPointIds,
+        "positions", changedMapPointPositions,
+    };
+
+    std::vector<MpId> mapPoints = currentKeyframe.mapPoints;
+    std::sort(mapPoints.begin(), mapPoints.end());
+
+    nlohmann::json keyframeMapPointIds = nlohmann::json::array();
+    for (const MpId mpId : mapPoints) {
+        if (mpId.v == -1) continue;
+        keyframeMapPointIds.push_back(mpId.v);
+    }
+    j["keyframe"] = {
+        "id", currentKeyframe.id.v,
+        "mapPointIds", keyframeMapPointIds,
+        "poseWorldToCamera", eigenToJson(currentKeyframe.poseCW),
+        // "camera", currentKeyframe.shared->camera->serialize(),
+    };
+
+    // TODO Write to a file.
+    std::cout << "-----------------------------" << std::endl;
+    std::cout << j.dump(4) << std::endl;
 }
 
 } // slam

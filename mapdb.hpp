@@ -12,6 +12,14 @@
 
 namespace slam {
 
+// Record for JSON ouput.
+class AltMapPointRecord {
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    Eigen::Vector3d position;
+};
+
 class MapDB {
 public:
 
@@ -59,6 +67,8 @@ public:
     std::map<MapKf, LoopStage> loopStages;
     std::vector<KfId> adjacentKfIds;
     std::map<MpId, MapPointRecord> mapPointRecords;
+
+    std::map<MpId, AltMapPointRecord> altMapPointRecords;
 
 private:
     Eigen::Matrix4d prevPose, prevInputPose, prevSmoothPose;
