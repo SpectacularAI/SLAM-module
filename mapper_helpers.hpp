@@ -160,7 +160,8 @@ ViewerAtlasMap mapDBtoViewerAtlasMap(const MapDB &mapDB);
 
 void serializeKeyframe(
     MapDB &mapDB,
-    const Keyframe &currentKeyframe
+    const Keyframe &currentKeyframe,
+    const odometry::Parameters &parameters
 );
 
 } // namespace slam

@@ -68,7 +68,9 @@ public:
     std::vector<KfId> adjacentKfIds;
     std::map<MpId, MapPointRecord> mapPointRecords;
 
+    // Stuff for JSON SLAM map output.
     std::map<MpId, AltMapPointRecord> altMapPointRecords;
+    int outputInd = 0;
 
 private:
     Eigen::Matrix4d prevPose, prevInputPose, prevSmoothPose;

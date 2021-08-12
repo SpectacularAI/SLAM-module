@@ -1,5 +1,8 @@
 #include "mapper_helpers.hpp"
 
+#include <memory>
+#include <stdexcept>
+
 #include "../util/util.hpp"
 #include "../util/logging.hpp"
 #include "../util/timer.hpp"
@@ -10,6 +13,7 @@
 #include "keyframe_matcher.hpp"
 #include "mapdb.hpp"
 
+#include <opencv2/imgcodecs.hpp>
 #include <nlohmann/json.hpp>
 
 using Eigen::Matrix3d;
@@ -19,6 +23,18 @@ using Eigen::Vector4d;
 using Eigen::Vector3d;
 using Eigen::Vector2d;
 using Eigen::Vector2f;
+
+namespace {
+template<typename ... Args>
+std::string stringFormat(const std::string& format, Args ... args) {
+    int size_s = std::snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
+    if( size_s <= 0 ){ throw std::runtime_error( "Error during formatting." ); }
+    auto size = static_cast<size_t>( size_s );
+    auto buf = std::make_unique<char[]>( size );
+    std::snprintf( buf.get(), size, format.c_str(), args ... );
+    return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
+}
+}
 
 namespace slam {
 
@@ -1006,7 +1022,7 @@ void addKeyframeCommonInner(
         }
     }
 
-    serializeKeyframe(mapDB, currentKeyframe);
+    serializeKeyframe(mapDB, currentKeyframe, settings.parameters);
 
     cullMapPoints(currentKeyframe, mapDB, ps);
     cullKeyframes(adjacentKfIds, mapDB, *bowIndex, ps);
@@ -1170,13 +1186,17 @@ nlohmann::json eigenToJson(const Eigen::Matrix4d &m) {
 
 void serializeKeyframe(
     MapDB &mapDB,
-    const Keyframe &currentKeyframe
+    const Keyframe &currentKeyframe,
+    const odometry::Parameters &parameters
 ) {
+    if (parameters.slam.mapJsonOutput.empty()) return;
+
     nlohmann::json j;
     nlohmann::json newMapPoints = nlohmann::json::array();
     nlohmann::json changedMapPointIds = nlohmann::json::array();
     nlohmann::json changedMapPointPositions = nlohmann::json::array();
 
+    // TODO Just save all the map points unless the files become very large.
     for (const auto &p : mapDB.mapPoints) {
         MpId mpId = p.first;
         const auto &mapPoint = p.second;
@@ -1217,16 +1237,56 @@ void serializeKeyframe(
         if (mpId.v == -1) continue;
         keyframeMapPointIds.push_back(mpId.v);
     }
-    j["keyframe"] = {
+    j["currentKeyframe"] = {
         "id", currentKeyframe.id.v,
         "mapPointIds", keyframeMapPointIds,
-        "poseWorldToCamera", eigenToJson(currentKeyframe.poseCW),
-        // "camera", currentKeyframe.shared->camera->serialize(),
+        // TODO Camera parameters.
     };
 
-    // TODO Write to a file.
-    std::cout << "-----------------------------" << std::endl;
-    std::cout << j.dump(4) << std::endl;
+    nlohmann::json keyframeIds = nlohmann::json::array();
+    nlohmann::json posesWorldToCameraLeft = nlohmann::json::array();
+    for (int ind = 0; ind < currentKeyframe.id.v; ++ind) {
+        KfId kfId(ind);
+        if (!mapDB.keyframes.count(kfId)) continue;
+        assert(mapDB.keyframes.at(kfId));
+        const Keyframe &keyframe = *mapDB.keyframes.at(kfId);
+        keyframeIds.push_back(kfId.v);
+        posesWorldToCameraLeft.push_back(eigenToJson(keyframe.poseCW));
+    }
+
+    j["keyframes"] = {
+        "ids", keyframeIds,
+        "posesWorldToCameraLeft", posesWorldToCameraLeft,
+        // TODO Right poses.
+    };
+
+    std::string num = stringFormat("%08d", mapDB.outputInd);
+
+    const std::string &dir = parameters.slam.mapJsonOutput;
+    std::string jsonFilePath = stringFormat("%s/%s_data.json", dir.c_str(), num.c_str());
+    std::ofstream jsonFile(jsonFilePath, std::ofstream::out);
+    std::string imageLeftFilePath = stringFormat("%s/%s_left.png", dir.c_str(), num.c_str());
+
+    assert(currentKeyframe.shared);
+    assert(!currentKeyframe.shared->imgDbg.empty());
+    // TODO Right images.
+    const cv::Mat &leftImage = currentKeyframe.shared->imgDbg;
+
+    std::vector<int> compression = { cv::IMWRITE_PNG_COMPRESSION };
+    bool success = false;
+    try {
+        success = imwrite(imageLeftFilePath, leftImage, compression);
+    }
+    catch (const cv::Exception &ex) {
+        log_error("Exception converting image to PNG format: %s", ex.what());
+    }
+    assert(success);
+
+    // std::cout << "-----------------------------" << std::endl;
+    // std::cout << j.dump(4) << std::endl;
+    jsonFile << j.dump(4) << std::endl;
+
+    ++mapDB.outputInd;
 }
 
 } // slam

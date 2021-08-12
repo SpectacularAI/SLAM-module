@@ -354,7 +354,8 @@ public:
         auto kfBackend = std::make_unique<Keyframe>(*kf);
         if (dataPublisher) {
             const auto &cmd = dataPublisher->getParameters();
-            if (cmd.visualizeOrbMatching || cmd.visualizeLoopOrbMatching || cmd.visualizeMapPointSearch) {
+            if (cmd.visualizeOrbMatching || cmd.visualizeLoopOrbMatching || cmd.visualizeMapPointSearch
+                    || !settings.parameters.slam.mapJsonOutput.empty()) {
                 // may fills odometry FrameBuffer without .clone()
                 kfBackend->shared->imgDbg = mapperInput->colorFrame.clone();
             }
@@ -403,7 +404,8 @@ public:
         }
         if (dataPublisher) {
             const auto &cmd = dataPublisher->getParameters();
-            if (cmd.visualizeOrbMatching || cmd.visualizeLoopOrbMatching || cmd.visualizeMapPointSearch) {
+            if (cmd.visualizeOrbMatching || cmd.visualizeLoopOrbMatching || cmd.visualizeMapPointSearch
+                    || !settings.parameters.slam.mapJsonOutput.empty()) {
                 // may fills odometry FrameBuffer without .clone()
                 kf->shared->imgDbg = mapperInput->colorFrame.clone();
             }
