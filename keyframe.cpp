@@ -91,6 +91,8 @@ Keyframe::Keyframe(const MapperInput &mapperInput) :
     assert(mapperInput.frame && mapperInput.frameRight);
     shared->camera = mapperInput.frame->getCamera();
     shared->cameraRight = mapperInput.frameRight->getCamera();
+    assert(shared->camera);
+    assert(shared->cameraRight);
 
     std::shared_ptr<tracker::CpuImage> imageLeft = std::dynamic_pointer_cast<tracker::CpuImage>(mapperInput.frame);
     cpuImageLeft = imageLeft->getOpenCvMat();
@@ -158,6 +160,7 @@ std::unique_ptr<KeyframeShared> KeyframeShared::clone() const
 {
     auto s = std::make_unique<KeyframeShared>();
     s->camera = camera;
+    s->cameraRight = cameraRight;
     s->imgDbg = imgDbg; // cv::Mat is copied shallowly.
     s->stereoPointCloud = stereoPointCloud; // shallow copy
     s->stereoPointCloudColor = stereoPointCloudColor;

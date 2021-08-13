@@ -1222,7 +1222,28 @@ void serializeKeyframe(
     j["currentKeyframe"] = {
         { "id", currentKeyframe.id.v },
         { "mapPointIds", keyframeMapPointIds },
-        // TODO Camera parameters.
+    };
+
+    assert(currentKeyframe.shared->camera);
+    assert(currentKeyframe.shared->cameraRight);
+    api::CameraParameters cameraLeft = currentKeyframe.shared->camera->getIntrinsic();
+    api::CameraParameters cameraRight = currentKeyframe.shared->cameraRight->getIntrinsic();
+    // NOTE Coefficients are empty if `-useRectification` is enabled.
+    std::vector<double> coeffsLeft = currentKeyframe.shared->camera->getCoeffs();
+    std::vector<double> coeffsRight = currentKeyframe.shared->cameraRight->getCoeffs();
+    j["currentKeyframe"]["cameraLeft"] = {
+        { "fx", cameraLeft.focalLengthX },
+        { "fy", cameraLeft.focalLengthY },
+        { "px", cameraLeft.principalPointX },
+        { "py", cameraLeft.principalPointY },
+        { "coeffs", coeffsLeft },
+    };
+    j["currentKeyframe"]["cameraRight"] = {
+        { "fx", cameraRight.focalLengthX },
+        { "fy", cameraRight.focalLengthY },
+        { "px", cameraRight.principalPointX },
+        { "py", cameraRight.principalPointY },
+        { "coeffs", coeffsRight },
     };
 
     nlohmann::json keyframeIds = nlohmann::json::array();
@@ -1249,8 +1270,6 @@ void serializeKeyframe(
     std::ofstream jsonFile(jsonFilePath, std::ofstream::out);
     std::string imageLeftFilePath = stringFormat("%s/%s_left.png", dir.c_str(), num.c_str());
     std::string imageRightFilePath = stringFormat("%s/%s_right.png", dir.c_str(), num.c_str());
-
-    assert(!currentKeyframe.shared->imgDbg.empty());
 
     std::vector<int> compression = { cv::IMWRITE_PNG_COMPRESSION };
     bool success = false;
