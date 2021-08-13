@@ -1192,41 +1192,22 @@ void serializeKeyframe(
     if (parameters.slam.mapJsonOutput.empty()) return;
 
     nlohmann::json j;
-    nlohmann::json newMapPoints = nlohmann::json::array();
-    nlohmann::json changedMapPointIds = nlohmann::json::array();
-    nlohmann::json changedMapPointPositions = nlohmann::json::array();
-
-    // TODO Just save all the map points unless the files become very large.
+    nlohmann::json mapPointIds = nlohmann::json::array();
+    nlohmann::json mapPointPositions = nlohmann::json::array();
     for (const auto &p : mapDB.mapPoints) {
         MpId mpId = p.first;
         const auto &mapPoint = p.second;
-        if (mapDB.altMapPointRecords.count(mpId)) {
-            if (mapDB.altMapPointRecords.at(mpId).position != mapPoint.position) {
-                mapDB.altMapPointRecords.at(mpId).position = mapPoint.position;
-                changedMapPointIds.push_back(mpId.v);
-                changedMapPointPositions.push_back({
-                    mapPoint.position(0),
-                    mapPoint.position(1),
-                    mapPoint.position(2)
-                });
-            }
-        }
-        else {
-            AltMapPointRecord a = {
-                .position = mapPoint.position,
-            };
-            mapDB.altMapPointRecords.insert({mpId, a});
-            nlohmann::json newMapPoint;
-            newMapPoint["id"] = mpId.v;
-            newMapPoint["position"] = { a.position(0), a.position(1), a.position(2) };
-            newMapPoints.push_back(newMapPoint);
-        }
+        mapPointIds.push_back(mpId.v);
+        mapPointPositions.push_back({
+            mapPoint.position(0),
+            mapPoint.position(1),
+            mapPoint.position(2)
+        });
     }
 
-    j["newMapPoints"] = newMapPoints;
-    j["changedMapPointPositions"] = {
-        "ids", changedMapPointIds,
-        "positions", changedMapPointPositions,
+    j["mapPoints"] = {
+        "ids", mapPointIds,
+        "positions", mapPointPositions,
     };
 
     std::vector<MpId> mapPoints = currentKeyframe.mapPoints;

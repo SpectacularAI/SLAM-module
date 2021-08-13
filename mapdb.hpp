@@ -12,14 +12,6 @@
 
 namespace slam {
 
-// Record for JSON ouput.
-class AltMapPointRecord {
-public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-    Eigen::Vector3d position;
-};
-
 class MapDB {
 public:
 
@@ -69,7 +61,6 @@ public:
     std::map<MpId, MapPointRecord> mapPointRecords;
 
     // Stuff for JSON SLAM map output.
-    std::map<MpId, AltMapPointRecord> altMapPointRecords;
     int outputInd = 0;
 
 private:
