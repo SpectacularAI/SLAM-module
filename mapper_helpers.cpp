@@ -1206,8 +1206,8 @@ void serializeKeyframe(
     }
 
     j["mapPoints"] = {
-        "ids", mapPointIds,
-        "positions", mapPointPositions,
+        { "ids", mapPointIds },
+        { "positions", mapPointPositions },
     };
 
     std::vector<MpId> mapPoints = currentKeyframe.mapPoints;
@@ -1219,8 +1219,8 @@ void serializeKeyframe(
         keyframeMapPointIds.push_back(mpId.v);
     }
     j["currentKeyframe"] = {
-        "id", currentKeyframe.id.v,
-        "mapPointIds", keyframeMapPointIds,
+        { "id", currentKeyframe.id.v },
+        { "mapPointIds", keyframeMapPointIds },
         // TODO Camera parameters.
     };
 
@@ -1236,8 +1236,8 @@ void serializeKeyframe(
     }
 
     j["keyframes"] = {
-        "ids", keyframeIds,
-        "posesWorldToCameraLeft", posesWorldToCameraLeft,
+        { "ids", keyframeIds },
+        { "posesWorldToCameraLeft", posesWorldToCameraLeft },
         // TODO Right poses.
     };
 
