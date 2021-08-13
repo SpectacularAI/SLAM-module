@@ -1248,6 +1248,7 @@ void serializeKeyframe(
 
     nlohmann::json keyframeIds = nlohmann::json::array();
     nlohmann::json posesWorldToCameraLeft = nlohmann::json::array();
+    nlohmann::json posesWorldToCameraRight = nlohmann::json::array();
     for (int ind = 0; ind < currentKeyframe.id.v; ++ind) {
         KfId kfId(ind);
         if (!mapDB.keyframes.count(kfId)) continue;
@@ -1255,12 +1256,14 @@ void serializeKeyframe(
         const Keyframe &keyframe = *mapDB.keyframes.at(kfId);
         keyframeIds.push_back(kfId.v);
         posesWorldToCameraLeft.push_back(eigenToJson(keyframe.poseCW));
+        posesWorldToCameraRight.push_back(eigenToJson((parameters.secondImuToCamera
+            * parameters.imuToCamera.inverse() * keyframe.poseCW).eval()));
     }
 
     j["keyframes"] = {
         { "ids", keyframeIds },
         { "posesWorldToCameraLeft", posesWorldToCameraLeft },
-        // TODO Right poses.
+        { "posesWorldToCameraRight", posesWorldToCameraRight },
     };
 
     std::string num = stringFormat("%08d", mapDB.outputInd);
@@ -1282,8 +1285,6 @@ void serializeKeyframe(
     }
     assert(success);
 
-    // std::cout << "-----------------------------" << std::endl;
-    // std::cout << j.dump(4) << std::endl;
     jsonFile << j.dump(4) << std::endl;
 
     ++mapDB.outputInd;
