@@ -1190,6 +1190,7 @@ void serializeKeyframe(
     const odometry::Parameters &parameters
 ) {
     if (parameters.slam.mapJsonOutput.empty()) return;
+    assert(currentKeyframe.shared);
 
     nlohmann::json j;
     nlohmann::json mapPointIds = nlohmann::json::array();
@@ -1212,12 +1213,12 @@ void serializeKeyframe(
 
     std::vector<MpId> mapPoints = currentKeyframe.mapPoints;
     std::sort(mapPoints.begin(), mapPoints.end());
-
     nlohmann::json keyframeMapPointIds = nlohmann::json::array();
     for (const MpId mpId : mapPoints) {
         if (mpId.v == -1) continue;
         keyframeMapPointIds.push_back(mpId.v);
     }
+
     j["currentKeyframe"] = {
         { "id", currentKeyframe.id.v },
         { "mapPointIds", keyframeMapPointIds },
@@ -1247,16 +1248,15 @@ void serializeKeyframe(
     std::string jsonFilePath = stringFormat("%s/%s_data.json", dir.c_str(), num.c_str());
     std::ofstream jsonFile(jsonFilePath, std::ofstream::out);
     std::string imageLeftFilePath = stringFormat("%s/%s_left.png", dir.c_str(), num.c_str());
+    std::string imageRightFilePath = stringFormat("%s/%s_right.png", dir.c_str(), num.c_str());
 
-    assert(currentKeyframe.shared);
     assert(!currentKeyframe.shared->imgDbg.empty());
-    // TODO Right images.
-    const cv::Mat &leftImage = currentKeyframe.shared->imgDbg;
 
     std::vector<int> compression = { cv::IMWRITE_PNG_COMPRESSION };
     bool success = false;
     try {
-        success = imwrite(imageLeftFilePath, leftImage, compression);
+        success = imwrite(imageLeftFilePath, currentKeyframe.cpuImageLeft, compression);
+        success &= imwrite(imageRightFilePath, currentKeyframe.cpuImageRight, compression);
     }
     catch (const cv::Exception &ex) {
         log_error("Exception converting image to PNG format: %s", ex.what());

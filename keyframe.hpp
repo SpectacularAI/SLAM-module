@@ -30,6 +30,7 @@ struct MapperInput {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     std::shared_ptr<tracker::Image> frame;
+    std::shared_ptr<tracker::Image> frameRight;
     std::vector<Feature> trackerFeatures;
     std::vector<slam::Pose> poseTrail;
     double t;
@@ -47,6 +48,7 @@ struct MapperInput {
  */
 struct KeyframeShared {
     std::shared_ptr<const tracker::Camera> camera;
+    std::shared_ptr<const tracker::Camera> cameraRight;
     KeyPointVector keyPoints;
     std::unique_ptr<FeatureSearch> featureSearch; // For speeding up feature search.
 
@@ -162,6 +164,9 @@ public:
     // True if ORB features have been computed, false if only
     // odometry-based info is present
     bool hasFullFeatures;
+
+    cv::Mat cpuImageLeft;
+    cv::Mat cpuImageRight;
 
     // For debugging
     std::string toString();

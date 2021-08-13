@@ -198,12 +198,14 @@ public:
 
     std::future<Slam::Result> addFrame(
         std::shared_ptr<tracker::Image> frame,
+        std::shared_ptr<tracker::Image> frameRight,
         const std::vector<slam::Pose> &poseTrail,
         const std::vector<Feature> &features,
         const cv::Mat &colorFrame
     ) final {
         auto mapperInput = std::unique_ptr<MapperInput>(new MapperInput);
         mapperInput->frame = frame;
+        mapperInput->frameRight = frameRight;
         mapperInput->trackerFeatures = features;
         mapperInput->poseTrail = poseTrail;
         mapperInput->t = poseTrail[0].t;

@@ -88,7 +88,15 @@ Keyframe::Keyframe(const MapperInput &mapperInput) :
     hasFullFeatures(false)
 {
     assert(id.v >= 0);
+    assert(mapperInput.frame && mapperInput.frameRight);
     shared->camera = mapperInput.frame->getCamera();
+    shared->cameraRight = mapperInput.frameRight->getCamera();
+
+    std::shared_ptr<tracker::CpuImage> imageLeft = std::dynamic_pointer_cast<tracker::CpuImage>(mapperInput.frame);
+    cpuImageLeft = imageLeft->getOpenCvMat();
+    std::shared_ptr<tracker::CpuImage> imageRight = std::dynamic_pointer_cast<tracker::CpuImage>(mapperInput.frameRight);
+    cpuImageRight = imageRight->getOpenCvMat();
+
     setStereoPointCloud(mapperInput, *shared);
 }
 
