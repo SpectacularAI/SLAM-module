@@ -25,6 +25,7 @@ using Eigen::Vector2d;
 using Eigen::Vector2f;
 
 namespace {
+
 template<typename ... Args>
 std::string stringFormat(const std::string& format, Args ... args) {
     int size_s = std::snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
@@ -34,7 +35,37 @@ std::string stringFormat(const std::string& format, Args ... args) {
     std::snprintf( buf.get(), size, format.c_str(), args ... );
     return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
 }
+
+nlohmann::json eigenToJson(const Eigen::Matrix4d &m) {
+    nlohmann::json j = nlohmann::json::array({
+        { m(0, 0), m(0, 1), m(0, 2), m(0, 3) },
+        { m(1, 0), m(1, 1), m(1, 2), m(1, 3) },
+        { m(2, 0), m(2, 1), m(2, 2), m(2, 3) },
+        { m(3, 0), m(3, 1), m(3, 2), m(3, 3) }
+    });
+    return j;
 }
+
+nlohmann::json intrinsicMatrix(const api::CameraParameters &intrinsics) {
+    double fx = intrinsics.focalLengthX;
+    double fy = intrinsics.focalLengthY;
+    double px = intrinsics.principalPointX;
+    double py = intrinsics.principalPointY;
+    nlohmann::json j = nlohmann::json::array({
+        { fx, 0,  px, 0 },
+        { 0,  fy, py, 0 },
+        { 0,  0,  1,  0 }
+    });
+    return j;
+}
+
+std::string cameraModel(const std::string &serialized) {
+    return serialized.find("fisheye") != std::string::npos
+        ? "kannala-brandt4"
+        : "pinhole";
+}
+
+} // anonymous namespace
 
 namespace slam {
 
@@ -1165,25 +1196,6 @@ KfId addKeyframeBackend(
         resultPointCloud);
 }
 
-nlohmann::json eigenToJson(const Eigen::Matrix3d &m) {
-    nlohmann::json j = nlohmann::json::array({
-        { m(0, 0), m(0, 1), m(0, 2) },
-        { m(1, 0), m(1, 1), m(1, 2) },
-        { m(2, 0), m(2, 1), m(2, 2) }
-    });
-    return j;
-}
-
-nlohmann::json eigenToJson(const Eigen::Matrix4d &m) {
-    nlohmann::json j = nlohmann::json::array({
-        { m(0, 0), m(0, 1), m(0, 2), m(0, 3) },
-        { m(1, 0), m(1, 1), m(1, 2), m(1, 3) },
-        { m(2, 0), m(2, 1), m(2, 2), m(2, 3) },
-        { m(3, 0), m(3, 1), m(3, 2), m(3, 3) }
-    });
-    return j;
-}
-
 void serializeKeyframe(
     MapDB &mapDB,
     const Keyframe &currentKeyframe,
@@ -1193,92 +1205,85 @@ void serializeKeyframe(
     assert(currentKeyframe.shared);
 
     nlohmann::json j;
-    nlohmann::json mapPointIds = nlohmann::json::array();
-    nlohmann::json mapPointPositions = nlohmann::json::array();
+    nlohmann::json mapPoints = nlohmann::json::array();
     for (const auto &p : mapDB.mapPoints) {
         MpId mpId = p.first;
         const auto &mapPoint = p.second;
-        mapPointIds.push_back(mpId.v);
-        mapPointPositions.push_back({
-            mapPoint.position(0),
-            mapPoint.position(1),
-            mapPoint.position(2)
+        mapPoints.push_back({
+            { "id", mpId.v },
+            { "position", {
+                mapPoint.position(0),
+                mapPoint.position(1),
+                mapPoint.position(2)
+            }},
         });
     }
+    j["mapPoints"] = mapPoints;
 
-    j["mapPoints"] = {
-        { "ids", mapPointIds },
-        { "positions", mapPointPositions },
-    };
+    std::string num = stringFormat("%08d", mapDB.outputInd);
+    std::string imageLeftName = stringFormat("%s_left.png", num.c_str());
+    std::string imageRightName = stringFormat("%s_right.png", num.c_str());
+    mapDB.cameraImagesLeft.insert({ currentKeyframe.id, imageLeftName });
+    mapDB.cameraImagesRight.insert({ currentKeyframe.id, imageRightName });
 
-    std::vector<MpId> mapPoints = currentKeyframe.mapPoints;
-    std::sort(mapPoints.begin(), mapPoints.end());
-    nlohmann::json keyframeMapPointIds = nlohmann::json::array();
-    for (const MpId mpId : mapPoints) {
-        if (mpId.v == -1) continue;
-        keyframeMapPointIds.push_back(mpId.v);
-    }
-
-    j["currentKeyframe"] = {
-        { "id", currentKeyframe.id.v },
-        { "mapPointIds", keyframeMapPointIds },
-    };
-
-    assert(currentKeyframe.shared->camera);
-    assert(currentKeyframe.shared->cameraRight);
-    api::CameraParameters cameraLeft = currentKeyframe.shared->camera->getIntrinsic();
-    api::CameraParameters cameraRight = currentKeyframe.shared->cameraRight->getIntrinsic();
-    // NOTE Coefficients are empty if `-useRectification` is enabled.
-    std::vector<double> coeffsLeft = currentKeyframe.shared->camera->getCoeffs();
-    std::vector<double> coeffsRight = currentKeyframe.shared->cameraRight->getCoeffs();
-    j["currentKeyframe"]["cameraLeft"] = {
-        { "fx", cameraLeft.focalLengthX },
-        { "fy", cameraLeft.focalLengthY },
-        { "px", cameraLeft.principalPointX },
-        { "py", cameraLeft.principalPointY },
-        { "coeffs", coeffsLeft },
-    };
-    j["currentKeyframe"]["cameraRight"] = {
-        { "fx", cameraRight.focalLengthX },
-        { "fy", cameraRight.focalLengthY },
-        { "px", cameraRight.principalPointX },
-        { "py", cameraRight.principalPointY },
-        { "coeffs", coeffsRight },
-    };
-
-    nlohmann::json keyframeIds = nlohmann::json::array();
-    nlohmann::json posesWorldToCameraLeft = nlohmann::json::array();
-    nlohmann::json posesWorldToCameraRight = nlohmann::json::array();
-    for (int ind = 0; ind < currentKeyframe.id.v; ++ind) {
+    nlohmann::json keyframes = nlohmann::json::array();
+    for (int ind = 0; ind <= currentKeyframe.id.v; ++ind) {
         KfId kfId(ind);
         if (!mapDB.keyframes.count(kfId)) continue;
         assert(mapDB.keyframes.at(kfId));
         const Keyframe &keyframe = *mapDB.keyframes.at(kfId);
-        keyframeIds.push_back(kfId.v);
-        posesWorldToCameraLeft.push_back(eigenToJson(keyframe.poseCW));
-        posesWorldToCameraRight.push_back(eigenToJson((parameters.secondImuToCamera
-            * parameters.imuToCamera.inverse() * keyframe.poseCW).eval()));
+
+        assert(keyframe.shared->camera);
+        assert(keyframe.shared->cameraRight);
+        api::CameraParameters intrinsicsLeft = keyframe.shared->camera->getIntrinsic();
+        api::CameraParameters intrinsicsRight = keyframe.shared->cameraRight->getIntrinsic();
+        // NOTE Coefficients are empty if `-useRectification` is enabled.
+        std::vector<double> coeffsLeft = keyframe.shared->camera->getCoeffs();
+        std::vector<double> coeffsRight = keyframe.shared->cameraRight->getCoeffs();
+
+        nlohmann::json cameraLeft = {
+            { "poseCameraToWorld", eigenToJson(keyframe.poseCW) },
+            { "intrinsicMatrix", intrinsicMatrix(intrinsicsLeft) },
+            { "imageFileName", mapDB.cameraImagesLeft.at(kfId) },
+            { "model", cameraModel(keyframe.shared->camera->serialize()) },
+        };
+        nlohmann::json cameraRight = {
+            { "poseCameraToWorld", eigenToJson((parameters.secondImuToCamera
+                * parameters.imuToCamera.inverse() * keyframe.poseCW).eval()) },
+            { "intrinsicMatrix", intrinsicMatrix(intrinsicsRight) },
+            { "imageFileName", mapDB.cameraImagesRight.at(kfId) },
+            { "model", cameraModel(keyframe.shared->cameraRight->serialize()) },
+        };
+        if (!coeffsLeft.empty()) cameraLeft["distortionCoefficients"] = coeffsLeft;
+        if (!coeffsRight.empty()) cameraRight["distortionCoefficients"] = coeffsRight;
+
+        std::vector<MpId> currentMapPoints = currentKeyframe.mapPoints;
+        std::sort(currentMapPoints.begin(), currentMapPoints.end());
+        nlohmann::json visibleMapPointIds = nlohmann::json::array();
+        for (const MpId mpId : currentMapPoints) {
+            if (mpId.v == -1) continue;
+            visibleMapPointIds.push_back(mpId.v);
+        }
+
+        keyframes.push_back({
+            { "id", kfId.v },
+            { "time", keyframe.t },
+            { "position", keyframe.cameraCenter() },
+            { "cameras", { cameraLeft, cameraRight } },
+            { "visibleMapPointIds", visibleMapPointIds },
+        });
     }
-
-    j["keyframes"] = {
-        { "ids", keyframeIds },
-        { "posesWorldToCameraLeft", posesWorldToCameraLeft },
-        { "posesWorldToCameraRight", posesWorldToCameraRight },
-    };
-
-    std::string num = stringFormat("%08d", mapDB.outputInd);
+    j["keyframes"] = keyframes;
 
     const std::string &dir = parameters.slam.mapJsonOutput;
     std::string jsonFilePath = stringFormat("%s/%s_data.json", dir.c_str(), num.c_str());
     std::ofstream jsonFile(jsonFilePath, std::ofstream::out);
-    std::string imageLeftFilePath = stringFormat("%s/%s_left.png", dir.c_str(), num.c_str());
-    std::string imageRightFilePath = stringFormat("%s/%s_right.png", dir.c_str(), num.c_str());
 
     std::vector<int> compression = { cv::IMWRITE_PNG_COMPRESSION };
     bool success = false;
     try {
-        success = imwrite(imageLeftFilePath, currentKeyframe.cpuImageLeft, compression);
-        success &= imwrite(imageRightFilePath, currentKeyframe.cpuImageRight, compression);
+        success = imwrite(stringFormat("%s/%s", dir.c_str(), imageLeftName.c_str()), currentKeyframe.cpuImageLeft, compression);
+        success &= imwrite(stringFormat("%s/%s", dir.c_str(), imageRightName.c_str()), currentKeyframe.cpuImageRight, compression);
     }
     catch (const cv::Exception &ex) {
         log_error("Exception converting image to PNG format: %s", ex.what());

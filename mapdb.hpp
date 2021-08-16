@@ -62,6 +62,8 @@ public:
 
     // Stuff for JSON SLAM map output.
     int outputInd = 0;
+    std::map<KfId, std::string> cameraImagesLeft;
+    std::map<KfId, std::string> cameraImagesRight;
 
 private:
     Eigen::Matrix4d prevPose, prevInputPose, prevSmoothPose;
