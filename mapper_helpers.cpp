@@ -1206,9 +1206,12 @@ void serializeKeyframe(
 
     nlohmann::json j;
     nlohmann::json mapPoints = nlohmann::json::array();
+    std::vector<MpId> validMapPoints;
     for (const auto &p : mapDB.mapPoints) {
         MpId mpId = p.first;
         const auto &mapPoint = p.second;
+        if (mpId.v == -1) continue;
+        if (mapPoint.position == Eigen::Vector3d::Zero()) continue;
         mapPoints.push_back({
             { "id", mpId.v },
             { "position", {
@@ -1217,6 +1220,7 @@ void serializeKeyframe(
                 mapPoint.position(2)
             }},
         });
+        validMapPoints.push_back(mpId);
     }
     j["mapPoints"] = mapPoints;
 
@@ -1257,12 +1261,18 @@ void serializeKeyframe(
         if (!coeffsLeft.empty()) cameraLeft["distortionCoefficients"] = coeffsLeft;
         if (!coeffsRight.empty()) cameraRight["distortionCoefficients"] = coeffsRight;
 
-        std::vector<MpId> currentMapPoints = currentKeyframe.mapPoints;
-        std::sort(currentMapPoints.begin(), currentMapPoints.end());
-        nlohmann::json visibleMapPointIds = nlohmann::json::array();
-        for (const MpId mpId : currentMapPoints) {
-            if (mpId.v == -1) continue;
-            visibleMapPointIds.push_back(mpId.v);
+        nlohmann::json mapPointObservations = nlohmann::json::array();
+        assert(keyframe.mapPoints.size() == keyframe.shared->keyPoints.size());
+        for (size_t i = 0; i < keyframe.mapPoints.size(); ++i) {
+            MpId mpId = keyframe.mapPoints.at(i);
+            if (std::find(validMapPoints.begin(), validMapPoints.end(), mpId) == validMapPoints.end()) {
+                continue;
+            }
+            const tracker::Feature::Point &pt = keyframe.shared->keyPoints.at(i).pt;
+            mapPointObservations.push_back({
+                { "mapPointId", mpId.v },
+                { "pixelCoordinates", { { pt.x, pt.y } /* left */, /* right frame coordinates */ } }
+            });
         }
 
         keyframes.push_back({
@@ -1270,7 +1280,7 @@ void serializeKeyframe(
             { "time", keyframe.t },
             { "position", keyframe.cameraCenter() },
             { "cameras", { cameraLeft, cameraRight } },
-            { "visibleMapPointIds", visibleMapPointIds },
+            { "mapPointObservations", mapPointObservations },
         });
     }
     j["keyframes"] = keyframes;
