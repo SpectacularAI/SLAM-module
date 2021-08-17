@@ -280,10 +280,8 @@ public:
 
         if (partialMapCopy) {
             timer(slam::TIME_STATS, "Copying partial map");
-            constexpr int minCovisibilities = 5; // TODO: Pulled out of a hat
             std::vector<KfId> adjacentKfIds = computeAdjacentKeyframes(
                 *latestKeyframe,
-                minCovisibilities,
                 settings.parameters.slam.adjacentSpaceSize,
                 mapDB,
                 settings,

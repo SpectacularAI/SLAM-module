@@ -35,23 +35,8 @@ void matchTrackedFeatures(
     const StaticSettings &settings
 );
 
-/**
- * Compute a set of spatially nearby keyframes. This function attempts to improve over
- * the "neighbors" concept from ORBSLAM/OpenVSLAM, which considers only visual "neighborness".
- * This tends to leave holes in the keyframe sequences, which in some situations (local BA) is
- * especially bad for our method that has strong inertial information about successive keyframes.
- *
- * @param currentKeyframe The keyframe to search around, won't be included in return vector.
- * @param minCovisibilities Number of shared map point observations required to include a keyframe from a different "island".
- * @param maxKeyframes Return up to this many keyframes, dropping more distant ones.
- * @param mapDB
- * @param settings
- * @param visualize Produce visualizations from this call.
- * @return Vector of keyframes, sorted by ascending distance, not including the argument keyframe.
- */
 std::vector<KfId> computeAdjacentKeyframes(
     const Keyframe &currentKeyframe,
-    int minCovisibilities,
     int maxKeyframes,
     const MapDB &mapDB,
     const StaticSettings &settings,

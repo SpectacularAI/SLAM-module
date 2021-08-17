@@ -140,64 +140,17 @@ void matchTrackedFeatures(
 
 std::vector<KfId> computeAdjacentKeyframes(
     const Keyframe &currentKeyframe,
-    int minCovisibilities,
     int maxKeyframes,
     const MapDB &mapDB,
     const StaticSettings &settings,
     bool visualize
 ) {
-    std::set<KfId> adjacentSet;
-
-    // In the following comments, "consecutive" means those that can be reached
-    // via finite number of steps following the next and prev KF pointers.
-
-    // Collect consecutive keyframes and their neighbors, call them `parents`.
-    std::set<KfId> parents;
-    int i = 0;
-    {
-        KfId backwards = currentKeyframe.id;
-        while (backwards.v != -1) {
-            adjacentSet.insert(backwards);
-            const Keyframe &keyframe = *mapDB.keyframes.at(backwards);
-            // getNeighbors() is somewhat slow, do not call for every keyframe.
-            if (i % 2 == 0) {
-                for (KfId kfId : keyframe.getNeighbors(mapDB, minCovisibilities, false)) {
-                    parents.insert(kfId);
-                }
-            }
-            if (++i >= maxKeyframes) {
-                break;
-            }
-            backwards = keyframe.previousKfId;
-        }
+    std::vector<KfId> adjacent;
+    // Not including current keyframe id.
+    for (int ind = 0; ind < currentKeyframe.id.v; ++ind) {
+        KfId kfId(ind);
+        if (mapDB.keyframes.count(kfId)) adjacent.push_back(kfId);
     }
-
-    // Return keyframes consecutive to some `parent`.
-    for (KfId parent : parents) {
-        KfId backwards = parent;
-        i = 0;
-        while (backwards.v != -1) {
-            adjacentSet.insert(backwards);
-            if (++i >= maxKeyframes / 2) {
-                break;
-            }
-            const Keyframe &keyframe = *mapDB.keyframes.at(backwards);
-            backwards = keyframe.previousKfId;
-        }
-        KfId forwards = parent;
-        i = 0;
-        while (forwards.v != -1) {
-            adjacentSet.insert(forwards);
-            if (++i >= maxKeyframes / 2) {
-                break;
-            }
-            const Keyframe &keyframe = *mapDB.keyframes.at(forwards);
-            forwards = keyframe.nextKfId;
-        }
-    }
-
-    adjacentSet.erase(currentKeyframe.id);
-    std::vector<KfId> adjacent(adjacentSet.begin(), adjacentSet.end());
 
     // Sort by distance.
     Eigen::Vector3d currentPos = currentKeyframe.cameraCenter();
@@ -988,10 +941,8 @@ void addKeyframeCommonInner(
     const bool isBackend = loopCloser != nullptr;
     matchTrackedFeatures(currentKeyframe, mapDB, settings);
 
-    constexpr int minCovisibilities = 5;
     std::vector<KfId> adjacentKfIds = computeAdjacentKeyframes(
         currentKeyframe,
-        minCovisibilities,
         ps.adjacentSpaceSize,
         mapDB,
         settings,

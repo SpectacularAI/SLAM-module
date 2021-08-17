@@ -166,10 +166,8 @@ std::set<MpId> localBundleAdjust(
 
     // Compute adjacent keyframes again, to make sure new connections found during
     // processing of the current keyframe are included.
-    constexpr int minCovisibilities = 15;
     std::vector<KfId> adjacent = computeAdjacentKeyframes(
         keyframe,
-        minCovisibilities,
         problemMaxSize,
         mapDB,
         settings);
