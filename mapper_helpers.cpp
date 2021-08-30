@@ -1246,13 +1246,13 @@ void serializeKeyframe(
         std::vector<double> coeffsRight = keyframe.shared->cameraRight->getCoeffs();
 
         nlohmann::json cameraLeft = {
-            { "poseCameraToWorld", eigenToJson(keyframe.poseCW) },
+            { "poseWorldToCamera", eigenToJson(keyframe.poseCW) },
             { "intrinsicMatrix", intrinsicMatrix(intrinsicsLeft) },
             { "imageFileName", mapDB.cameraImagesLeft.at(kfId) },
             { "model", cameraModel(keyframe.shared->camera->serialize()) },
         };
         nlohmann::json cameraRight = {
-            { "poseCameraToWorld", eigenToJson((parameters.secondImuToCamera
+            { "poseWorldToCamera", eigenToJson((parameters.secondImuToCamera
                 * parameters.imuToCamera.inverse() * keyframe.poseCW).eval()) },
             { "intrinsicMatrix", intrinsicMatrix(intrinsicsRight) },
             { "imageFileName", mapDB.cameraImagesRight.at(kfId) },
