@@ -34,6 +34,7 @@ struct MapperInput {
     std::vector<Feature> trackerFeatures;
     std::vector<slam::Pose> poseTrail;
     double t;
+    size_t originalFrameInd = -1;
 
     // for debuggging & nicer visualization. Can be empty
     cv::Mat colorFrame;

@@ -201,7 +201,8 @@ public:
         std::shared_ptr<tracker::Image> frameRight,
         const std::vector<slam::Pose> &poseTrail,
         const std::vector<Feature> &features,
-        const cv::Mat &colorFrame
+        const cv::Mat &colorFrame,
+        size_t originalFrameInd
     ) final {
         auto mapperInput = std::unique_ptr<MapperInput>(new MapperInput);
         mapperInput->frame = frame;
@@ -209,6 +210,7 @@ public:
         mapperInput->trackerFeatures = features;
         mapperInput->poseTrail = poseTrail;
         mapperInput->t = poseTrail[0].t;
+        mapperInput->originalFrameInd = originalFrameInd;
         mapperInput->colorFrame = colorFrame;
 
         return worker->enqueueMapperInput(std::unique_ptr<Worker::Task::Mapper>(

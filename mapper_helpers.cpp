@@ -983,8 +983,9 @@ void addKeyframeCommonInner(
     LoopCloser *loopCloser,
     BowIndex *bowIndex,
     CommandQueue *commands,
-    ViewerDataPublisher *dataPublisher)
-{
+    ViewerDataPublisher *dataPublisher,
+    size_t originalFrameInd
+) {
     const odometry::ParametersSlam &ps = settings.parameters.slam;
 
     const bool isBackend = loopCloser != nullptr;
@@ -1053,7 +1054,7 @@ void addKeyframeCommonInner(
         }
     }
 
-    serializeKeyframe(mapDB, currentKeyframe, settings.parameters);
+    serializeKeyframe(mapDB, currentKeyframe, settings.parameters, originalFrameInd);
 
     cullMapPoints(currentKeyframe, mapDB, ps);
     cullKeyframes(adjacentKfIds, mapDB, *bowIndex, ps);
@@ -1136,7 +1137,9 @@ static KfId addKeyframeCommonOuter(
         loopCloser,
         bowIndex,
         commands,
-        dataPublisher);
+        dataPublisher,
+        mapperInput.originalFrameInd
+    );
 
     if (keyFrameDecision || !settings.parameters.slam.useVariableLengthDeltas)
         mapDB.updatePrevPose(*currentKeyframe, poseTrail.at(0).pose);
@@ -1199,7 +1202,8 @@ KfId addKeyframeBackend(
 void serializeKeyframe(
     MapDB &mapDB,
     const Keyframe &currentKeyframe,
-    const odometry::Parameters &parameters
+    const odometry::Parameters &parameters,
+    size_t originalFrameInd
 ) {
     if (parameters.slam.mapJsonOutput.empty()) return;
     assert(currentKeyframe.shared);
@@ -1229,6 +1233,7 @@ void serializeKeyframe(
     std::string imageRightName = stringFormat("%s_right.png", num.c_str());
     mapDB.cameraImagesLeft.insert({ currentKeyframe.id, imageLeftName });
     mapDB.cameraImagesRight.insert({ currentKeyframe.id, imageRightName });
+    mapDB.originalFrameInds.insert({ currentKeyframe.id, originalFrameInd });
 
     nlohmann::json keyframes = nlohmann::json::array();
     for (int ind = 0; ind <= currentKeyframe.id.v; ++ind) {
@@ -1281,6 +1286,7 @@ void serializeKeyframe(
             { "position", keyframe.cameraCenter() },
             { "cameras", { cameraLeft, cameraRight } },
             { "mapPointObservations", mapPointObservations },
+            { "videoFrameInd", mapDB.originalFrameInds.at(kfId) },
         });
     }
     j["keyframes"] = keyframes;

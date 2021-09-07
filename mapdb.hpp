@@ -64,6 +64,7 @@ public:
     int outputInd = 0;
     std::map<KfId, std::string> cameraImagesLeft;
     std::map<KfId, std::string> cameraImagesRight;
+    std::map<KfId, size_t> originalFrameInds;
 
 private:
     Eigen::Matrix4d prevPose, prevInputPose, prevSmoothPose;
